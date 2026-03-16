@@ -1,11 +1,23 @@
 import java.util.*;
 
+class InvalidBookingException extends Exception {
+    public InvalidBookingException(String message) {
+        super(message);
+    }
+}
+
 class Reservation {
     private String guestName;
     private String roomType;
     private String reservationId;
 
-    public Reservation(String guestName, String roomType, String reservationId) {
+    public Reservation(String guestName, String roomType, String reservationId) throws InvalidBookingException {
+        if (guestName == null || guestName.trim().isEmpty()) {
+            throw new InvalidBookingException("Guest name cannot be empty.");
+        }
+        if (roomType == null || roomType.trim().isEmpty()) {
+            throw new InvalidBookingException("Room type cannot be empty.");
+        }
         this.guestName = guestName;
         this.roomType = roomType;
         this.reservationId = reservationId;
@@ -24,70 +36,59 @@ class Reservation {
     }
 }
 
-class Service {
-    private String name;
-    private double cost;
+class RoomInventory {
+    private Map<String, Integer> inventory;
 
-    public Service(String name, double cost) {
-        this.name = name;
-        this.cost = cost;
+    public RoomInventory() {
+        inventory = new HashMap<>();
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public double getCost() {
-        return cost;
-    }
-}
-
-class AddOnServiceManager {
-    private Map<String, List<Service>> serviceMap;
-
-    public AddOnServiceManager() {
-        serviceMap = new HashMap<>();
-    }
-
-    public void addServiceToReservation(String reservationId, Service service) {
-        serviceMap.putIfAbsent(reservationId, new ArrayList<>());
-        serviceMap.get(reservationId).add(service);
-        System.out.println("Service '" + service.getName() + "' added to Reservation ID: " + reservationId);
-    }
-
-    public void displayServices(String reservationId) {
-        List<Service> services = serviceMap.getOrDefault(reservationId, new ArrayList<>());
-        if (services.isEmpty()) {
-            System.out.println("No add-on services selected for Reservation ID: " + reservationId);
-        } else {
-            System.out.println("Add-On Services for Reservation ID: " + reservationId);
-            double totalCost = 0;
-            for (Service service : services) {
-                System.out.println("- " + service.getName() + " | Cost: " + service.getCost());
-                totalCost += service.getCost();
-            }
-            System.out.println("Total Additional Cost: " + totalCost);
+    public void addRoomType(String roomType, int availability) throws InvalidBookingException {
+        if (availability < 0) {
+            throw new InvalidBookingException("Availability cannot be negative for room type: " + roomType);
         }
+        inventory.put(roomType, availability);
+    }
+
+    public int getAvailability(String roomType) throws InvalidBookingException {
+        if (!inventory.containsKey(roomType)) {
+            throw new InvalidBookingException("Invalid room type requested: " + roomType);
+        }
+        return inventory.get(roomType);
+    }
+
+    public void allocateRoom(String roomType) throws InvalidBookingException {
+        int available = getAvailability(roomType);
+        if (available <= 0) {
+            throw new InvalidBookingException("No rooms available for type: " + roomType);
+        }
+        inventory.put(roomType, available - 1);
     }
 }
 
 public class BookMyStayApp {
     public static void main(String[] args) {
         System.out.println("Welcome to Book My Stay App");
-        System.out.println("Hotel Booking System v7.1");
+        System.out.println("Hotel Booking System v9.1");
 
-        Reservation reservation1 = new Reservation("Alice", "Single Room", "RES-001");
-        Reservation reservation2 = new Reservation("Bob", "Suite Room", "RES-002");
+        RoomInventory inventory = new RoomInventory();
+        try {
+            inventory.addRoomType("Single Room", 2);
+            inventory.addRoomType("Double Room", 1);
+            inventory.addRoomType("Suite Room", 0);
 
-        AddOnServiceManager serviceManager = new AddOnServiceManager();
+            Reservation r1 = new Reservation("Alice", "Single Room", "RES-001");
+            Reservation r2 = new Reservation("Bob", "Suite Room", "RES-002");
+            Reservation r3 = new Reservation("", "Double Room", "RES-003"); // invalid guest name
 
-        serviceManager.addServiceToReservation(reservation1.getReservationId(), new Service("Breakfast", 300.0));
-        serviceManager.addServiceToReservation(reservation1.getReservationId(), new Service("Airport Pickup", 800.0));
-        serviceManager.addServiceToReservation(reservation2.getReservationId(), new Service("Spa Access", 1200.0));
+            inventory.allocateRoom(r1.getRoomType());
+            System.out.println("Reservation confirmed for " + r1.getGuestName());
 
-        System.out.println();
-        serviceManager.displayServices(reservation1.getReservationId());
-        System.out.println();
-        serviceManager.displayServices(reservation2.getReservationId());
+            inventory.allocateRoom(r2.getRoomType()); // should fail (no availability)
+            System.out.println("Reservation confirmed for " + r2.getGuestName());
+
+        } catch (InvalidBookingException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 }
